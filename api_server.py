@@ -4,6 +4,14 @@ from typing import Optional, List
 import pickle
 import json  # Ensure json is imported correctly
 
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import firestore
+cred = credentials.Certificate("pyfirebasesdk.json")
+firebase_admin.initialize_app(cred)
+
+db=firestore.client()
+
 app = FastAPI()
 
 # Load the pkl file
@@ -41,7 +49,27 @@ async def predict_fish(
         else:
             fish_type = "Salmon"
 
+        try:
+            # Query documents
+            fish_data_collection = db.collection('buoys').where("id", "==", entry_id).stream()
+
+            # Update documents
+            for doc in fish_data_collection:
+                data = doc.to_dict()
+                print("Updating document:", doc.id)
+                doc.reference.update({"fish": fish_type})
+                print("Document updated successfully.")
+
+            # Commit batched writes
+            batch.commit()
+            print("Batch committed successfully.")
+
+        except Exception as e:
+            print("An error occurred in db updation part:", str(e))
+
+
+
         return fish_type  # No need to use json.dumps() here
 
     except Exception as e:
-        return JSONResponse(content={"error": str(e)})
+        return JSONResponse(content={"error in prediction ": str(e)})
